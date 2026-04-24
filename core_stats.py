@@ -1,46 +1,43 @@
-import math
+import requests
 
 class OracleCore:
-    def __init__(self):
-        # Por ahora no pedimos API Key para probar la lógica pura
-        pass
+    # ... (aquí mantén tus funciones de poisson y analizar_partido) ...
 
-    def poisson(self, k, lamb):
-        """Calcula la probabilidad de que ocurran exactamente k eventos"""
-        return (lamb**k * math.exp(-lamb)) / math.factorial(k)
-
-    def analizar_partido(self, lambda_local, lambda_visitante):
+    def obtener_datos_equipo(self, team_id, api_key):
         """
-        Calcula las probabilidades de Gana/Empata/Pierde 
-        basado en los promedios de goles (Lambdas).
+        Consulta los últimos 10 partidos y devuelve el 
+        promedio de goles anotados y recibidos.
         """
-        prob_local = 0
-        prob_empate = 0
-        prob_visitante = 0
-        
-        # Analizamos un rango de hasta 5 goles por equipo (lo más común)
-        for goles_l in range(6):
-            for goles_v in range(6):
-                p = self.poisson(goles_l, lambda_local) * self.poisson(goles_v, lambda_visitante)
-                
-                if goles_l > goles_v:
-                    prob_local += p
-                elif goles_l == goles_v:
-                    prob_empate += p
-                else:
-                    prob_visitante += p
-                    
-        return {
-            "Gana Local": round(prob_local * 100, 2),
-            "Empate": round(prob_empate * 100, 2),
-            "Gana Visitante": round(prob_visitante * 100, 2)
+        url = "https://v3.football.api-sports.io/fixtures"
+        headers = {
+            'x-rapidapi-key': api_key,
+            'x-rapidapi-host': 'v3.football.api-sports.io'
         }
-
-# --- PRUEBA DE FUEGO ---
-# Supongamos que Nacional (local) promedia 1.8 goles y Millonarios (visita) 1.2
-oracle = OracleCore()
-resultado = oracle.analizar_partido(1.8, 1.2)
-
-print(f"Probabilidades calculadas:")
-for clave, valor in resultado.items():
-    print(f"{clave}: {valor}%")
+        
+        # Pedimos los últimos 10 partidos terminados
+        params = {"team": team_id, "last": 10, "status": "FT"}
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json()
+            
+            goles_anotados = 0
+            goles_recibidos = 0
+            
+            for partido in data['response']:
+                # Verificamos si el equipo era local o visitante para sumar bien
+                if partido['teams']['home']['id'] == team_id:
+                    goles_anotados += partido['goals']['home']
+                    goles_recibidos += partido['goals']['away']
+                else:
+                    goles_anotados += partido['goals']['away']
+                    goles_recibidos += partido['goals']['home']
+            
+            # Calculamos el Lambda (promedio)
+            return {
+                "lambda_ataque": goles_anotados / 10,
+                "lambda_defensa": goles_recibidos / 10
+            }
+        except Exception as e:
+            print(f"Error extrayendo datos: {e}")
+            return None
